@@ -69,7 +69,10 @@ Follow the [Windsurf MCP docs](https://docs.windsurf.com/windsurf/cascade/mcp). 
 <details>
 <summary>Antigravity</summary>
 
-Follow the [Antigravity MCP docs](https://antigravity.google/docs/mcp). Use the standard config above.
+Follow the [Antigravity MCP docs](https://antigravity.google/docs/mcp). Use the standard config above in:
+
+- IDE: `~/.gemini/config/mcp_config.json`
+- CLI: `~/.gemini/antigravity-cli/mcp_config.json`
 
 </details>
 
