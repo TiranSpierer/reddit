@@ -98,6 +98,41 @@ Follow the [Cline MCP docs](https://docs.cline.bot/mcp/configuring-mcp-servers).
 
 </details>
 
+<details>
+<summary>Authenticated mode (optional)</summary>
+
+If you have Reddit API credentials, add them as environment variables for higher rate limits:
+
+```json
+{
+  "mcpServers": {
+    "reddit-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "git+https://github.com/TiranSpierer/reddit-mcp.git"
+      ],
+      "env": {
+        "REDDIT_CLIENT_ID": "your_client_id",
+        "REDDIT_CLIENT_SECRET": "your_client_secret"
+      }
+    }
+  }
+}
+```
+
+Claude Code:
+```bash
+claude mcp add reddit-mcp -s user \
+  -e REDDIT_CLIENT_ID=your_client_id \
+  -e REDDIT_CLIENT_SECRET=your_client_secret \
+  -- npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
+```
+
+To get credentials, submit a request through Reddit's [developer form](https://support.reddithelp.com/hc/en-us/requests/new?ticket_form_id=14868593862164&tf_14867328473236=api_request_type_enterprise). See their [API access policy](https://support.reddithelp.com/hc/articles/42728983564564) for details.
+
+</details>
+
 ---
 
 <details>

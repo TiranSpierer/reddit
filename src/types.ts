@@ -171,7 +171,8 @@ export type ErrorCode =
   | "SUBREDDIT_PRIVATE"
   | "SUBREDDIT_BANNED"
   | "SUBREDDIT_QUARANTINED"
-  | "NETWORK_ERROR";
+  | "NETWORK_ERROR"
+  | "CHALLENGE_REQUIRED";
 
 export class RedditError extends Error {
   constructor(

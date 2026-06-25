@@ -11,6 +11,7 @@ import { searchReddit, searchSubredditPosts } from "./tools/search.js";
 import { searchSubreddits, getSubredditInfo, getSubredditPosts } from "./tools/subreddits.js";
 import { getPost } from "./tools/posts.js";
 import { RedditError } from "./types.js";
+import { reddit } from "./client.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -232,6 +233,41 @@ server.registerTool(
     }
   }
 );
+
+// ─── Challenge recovery tool (only in anonymous mode) ─────────────────────────
+
+if (!process.env.REDDIT_CLIENT_ID || !process.env.REDDIT_CLIENT_SECRET) {
+  server.registerTool(
+    "solve_reddit_challenge",
+    {
+      description:
+        "Recovery-only tool. Do NOT call this preemptively. Only call it when another tool returned a CHALLENGE_REQUIRED error containing JavaScript and a form — at that point, compute the value the JS would set into the form's `solution` field, then call this with that solution and the token from the form. After it succeeds, retry the original tool call.",
+      inputSchema: {
+        solution: z
+          .string()
+          .describe("The computed solution value (what the challenge JS would assign to the solution field)"),
+        token: z
+          .string()
+          .describe("The token value from the challenge form's <input name=\"token\"> element"),
+      },
+    },
+    async (args) => {
+      try {
+        await reddit.submitChallengeSolution(args.solution, args.token);
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Solution accepted, cookies stored. Retry your original tool call.",
+            },
+          ],
+        };
+      } catch (err) {
+        return handleError(err);
+      }
+    }
+  );
+}
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
