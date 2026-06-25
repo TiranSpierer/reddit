@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A read-only MCP server that wraps Reddit's public JSON API (no API key required). Provides 6 tools for searching Reddit, discovering subreddits, browsing feeds, and reading full post/comment trees. Communicates over stdio and is launched as a subprocess by MCP clients.
+A read-only MCP server for Reddit. Provides 6 tools for searching Reddit, discovering subreddits, browsing feeds, and reading full post/comment trees. Supports two access modes: OAuth (when `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` env vars are set) or anonymous (no credentials needed). Communicates over stdio and is launched as a subprocess by MCP clients.
 
 ## Commands
 
@@ -38,11 +38,15 @@ Then call the relevant `mcp__reddit-mcp-dev__*` tool directly to verify the chan
 
 ### Source Layout (src/)
 
-- **index.ts** — Entry point. Creates `McpServer`, registers one resource (`reddit://api-behavior`) and all 6 tools with Zod input schemas, connects via `StdioServerTransport`. Tool results are serialized as YAML (with JSON fallback) for token efficiency. All tool handlers share the same error-handling pattern: `RedditError` → `{ isError: true }` response, anything else re-thrown.
+- **index.ts** — Entry point. Creates `McpServer`, registers one resource (`reddit://api-behavior`) and all 6 tools with Zod input schemas, connects via `StdioServerTransport`. In anonymous mode (no OAuth env vars), also registers `solve_reddit_challenge` as a 7th recovery tool. Tool results are serialized as YAML (with JSON fallback) for token efficiency. All tool handlers share the same error-handling pattern: `RedditError` → `{ isError: true }` response, anything else re-thrown.
 
-- **client.ts** — Singleton `RedditClient` (exported as `reddit`). Appends `.json` to Reddit paths, uses native `fetch`. Handles rate limiting (tracks `x-ratelimit-*` headers, sleeps when exhausted, retries once on 429). Distinguishes private/banned subreddits on 403.
+- **client.ts** — Singleton `RedditClient` (exported as `reddit`). Two access paths selected at startup based on env vars:
+  - **OAuth path** (env `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET`): fetches a bearer token via client-credentials grant, sends requests to `oauth.reddit.com`, auto-refreshes on 401.
+  - **Anonymous path** (no env vars): solves Reddit's JS challenge to obtain session cookies, sends requests to `www.reddit.com/.json`. On 403, clears cookies and re-solves once. If the challenge format changes and auto-parsing fails, throws `CHALLENGE_REQUIRED` so the LLM can solve it via the `solve_reddit_challenge` tool (only registered in anonymous mode).
+  
+  Both paths share rate-limit tracking (`x-ratelimit-*` headers, sleep when exhausted, retry once on 429) and the same error classification for 403/404.
 
-- **types.ts** — Two type layers: raw types matching Reddit's API shape (`RawPost`, `RawComment`, etc.) and clean output types returned to MCP clients (`PostSummary`, `PostFull`, `Comment`, etc.). Also contains `RedditError` (typed `code` field: `NOT_FOUND`, `RATE_LIMITED`, `SUBREDDIT_PRIVATE`, etc.) and helper functions (`normalizeSubreddit`, `extractPostId`, `toPostSummary`, etc.).
+- **types.ts** — Two type layers: raw types matching Reddit's API shape (`RawPost`, `RawComment`, etc.) and clean output types returned to MCP clients (`PostSummary`, `PostFull`, `Comment`, etc.). Also contains `RedditError` (typed `code` field: `NOT_FOUND`, `RATE_LIMITED`, `SUBREDDIT_PRIVATE`, `CHALLENGE_REQUIRED`, etc.) and helper functions (`normalizeSubreddit`, `extractPostId`, `toPostSummary`, etc.).
 
 - **tools/search.ts** — `searchReddit`, `searchSubredditPosts` → return `{ posts: PostSummary[], after }`.
 - **tools/subreddits.ts** — `searchSubreddits`, `getSubredditInfo` (two sequential requests: about + rules, with quarantine check), `getSubredditPosts`.
@@ -51,7 +55,8 @@ Then call the relevant `mcp__reddit-mcp-dev__*` tool directly to verify the chan
 ### Key Patterns
 
 - All Reddit API interaction goes through the singleton `reddit` client in `client.ts` — never call `fetch` directly.
-- Rate limit: 100 requests per 10 minutes, tracked automatically by the client.
+- Auth mode is decided once at import time: if `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` are set, OAuth is used; otherwise anonymous.
+- Rate limit: tracked automatically by the client from response headers.
 - The `bin` field in package.json points to `dist/index.js` (has shebang), enabling `npx` installation.
 
 ### Dependencies
