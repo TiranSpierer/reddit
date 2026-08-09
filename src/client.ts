@@ -22,7 +22,7 @@ const BROWSER_HEADERS = {
 };
 
 const CHALLENGE_BOOTSTRAP_URL = `${BASE_URL}/r/popular/hot.atom`;
-const CHALLENGE_MARKER = "Please wait for verification";
+const CHALLENGE_MARKER = 'name="js_challenge"';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
