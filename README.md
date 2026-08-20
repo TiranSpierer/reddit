@@ -69,10 +69,10 @@ Follow the [Windsurf MCP docs](https://docs.windsurf.com/windsurf/cascade/mcp). 
 <details>
 <summary>Antigravity</summary>
 
-Follow the [Antigravity MCP docs](https://antigravity.google/docs/mcp). Use the standard config above in:
-
-- IDE: `~/.gemini/config/mcp_config.json`
-- CLI: `~/.gemini/antigravity-cli/mcp_config.json`
+Run in terminal:
+```bash
+agy mcp add reddit-mcp -- npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
+```
 
 </details>
 
@@ -127,6 +127,14 @@ claude mcp add reddit-mcp -s user \
   -e REDDIT_CLIENT_ID=your_client_id \
   -e REDDIT_CLIENT_SECRET=your_client_secret \
   -- npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
+```
+
+Antigravity:
+```bash
+agy mcp add \
+  -e REDDIT_CLIENT_ID=your_client_id \
+  -e REDDIT_CLIENT_SECRET=your_client_secret \
+  reddit-mcp -- npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
 ```
 
 To get credentials, submit a request through Reddit's [developer form](https://support.reddithelp.com/hc/en-us/requests/new?ticket_form_id=14868593862164&tf_14867328473236=api_request_type_enterprise). See their [API access policy](https://support.reddithelp.com/hc/articles/42728983564564) for details.
