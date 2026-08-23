@@ -4,15 +4,17 @@
   "description": "Read-only Reddit MCP server — search and read Reddit without API keys",
   "type": "module",
   "bin": {
-    "reddit-mcp": "./dist/index.js"
+    "reddit-mcp": "./dist/index.js",
+    "reddit-cli": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/index.js dist/cli.js",
     "prepare": "npm run build",
     "dev": "tsc --watch"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "commander": "^14.0.0",
     "yaml": "^2.0.0",
     "zod": "^4.0.0"
   },

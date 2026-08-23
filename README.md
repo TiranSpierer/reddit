@@ -4,6 +4,14 @@ Read-only Reddit MCP server. Search Reddit and read discussions without an API k
 
 Search across Reddit or within specific communities, browse feeds, and read full discussion threads.
 
+The package also provides `reddit-cli`, generated from the same schemas and handlers as the MCP server:
+
+```bash
+npx -y git+https://github.com/TiranSpierer/reddit-mcp.git reddit-cli --help
+reddit-cli search-reddit "mechanical keyboards" --sort top --time year
+reddit-cli get-post abc123
+```
+
 ## Install
 
 **Standard config** works in most tools:

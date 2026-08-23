@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A read-only MCP server for Reddit. Provides 6 tools for searching Reddit, discovering subreddits, browsing feeds, and reading full post/comment trees. Supports two access modes: OAuth (when `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` env vars are set) or anonymous (no credentials needed). Communicates over stdio and is launched as a subprocess by MCP clients.
+A read-only MCP server and CLI for Reddit. Provides 6 tools for searching Reddit, discovering subreddits, browsing feeds, and reading full post/comment trees. Supports two access modes: OAuth (when `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` env vars are set) or anonymous (no credentials needed).
 
 ## Commands
 
@@ -38,7 +38,9 @@ Then call the relevant `mcp__reddit-mcp-dev__*` tool directly to verify the chan
 
 ### Source Layout (src/)
 
-- **index.ts** — Entry point. Creates `McpServer`, registers one resource (`reddit://api-behavior`) and all 6 tools with Zod input schemas, connects via `StdioServerTransport`. In anonymous mode (no OAuth env vars), also registers `solve_reddit_challenge` as a 7th recovery tool. Tool results are serialized as YAML (with JSON fallback) for token efficiency. All tool handlers share the same error-handling pattern: `RedditError` → `{ isError: true }` response, anything else re-thrown.
+- **index.ts** / **server.ts** — stdio entry point and MCP registration, including the `reddit://api-behavior` resource.
+- **tools/index.ts** — single registry of tool schemas and handlers shared by MCP and CLI. Anonymous mode also adds `solve_reddit_challenge`.
+- **cli.ts** / **cli-gen.ts** — schema-generated `reddit-cli` commands over the same handlers.
 
 - **client.ts** — Singleton `RedditClient` (exported as `reddit`). Two access paths selected at startup based on env vars:
   - **OAuth path** (env `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET`): fetches a bearer token via client-credentials grant, sends requests to `oauth.reddit.com`, auto-refreshes on 401.
