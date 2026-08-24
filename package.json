@@ -8,7 +8,7 @@
     "reddit-cli": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc && chmod +x dist/index.js dist/cli.js",
+    "build": "tsc && node -e \"['dist/index.js','dist/cli.js'].forEach(f=>require('fs').chmodSync(f,0o755))\"",
     "prepare": "npm run build",
     "dev": "tsc --watch"
   },
