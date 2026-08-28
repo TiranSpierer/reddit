@@ -1,5 +1,7 @@
 # reddit-mcp
 
+Recommended: install [`web-platforms`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace. The CLI is preferred over MCP for better token efficiency.
+
 Read-only Reddit MCP server. Search Reddit and read discussions without an API key.
 
 Search across Reddit or within specific communities, browse feeds, and read full discussion threads.
