@@ -3,7 +3,7 @@ import { reddit } from "../client.js";
 import {
   type RawPost, type RawSubreddit, type RawListing, type RawRulesResponse,
   type PostSummary, type SubredditSummary, type SubredditFull, toPostSummary, toSubredditSummary,
-  normalizeSubreddit, normalizeSubredditType, RedditError,
+  normalizeSubreddit, normalizeSubredditType, decodeRedditText, RedditError,
 } from "../types.js";
 import type { TimeWindow } from "./search.js";
 
@@ -37,8 +37,11 @@ export async function subredditInfo(subreddit: string): Promise<SubredditFull> {
     type: normalizeSubredditType(about.data.subreddit_type),
     nsfw: about.data.over18,
     url: `https://www.reddit.com${about.data.url}`,
-    description_long: about.data.description,
-    rules: (rules.rules ?? []).map((rule) => ({ short_name: rule.short_name, description: rule.description })),
+    description_long: decodeRedditText(about.data.description),
+    rules: (rules.rules ?? []).map((rule) => ({
+      short_name: decodeRedditText(rule.short_name),
+      description: decodeRedditText(rule.description),
+    })),
   };
 }
 

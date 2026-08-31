@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { Comment, PostSummary, SubredditFull, ThreadResult } from "@tiranspierer/reddit-core";
+import type { Comment, PostSummary, SubredditFull, SubredditSummary, ThreadResult } from "@tiranspierer/reddit-core";
 import { atomicWrite, subredditDirectory, threadDirectory } from "./files.js";
 import { toYaml } from "./format.js";
 
@@ -10,11 +10,28 @@ function iso(timestamp: number): string {
 export function presentListing<T extends { posts: PostSummary[]; after: string | null }>(result: T): unknown {
   return {
     ...result,
-    posts: result.posts.map((post) => ({
-      ...post,
-      created: iso(post.created_utc),
-      created_utc: undefined,
-    })),
+    posts: result.posts.map((post) => {
+      const { created_utc, flair, nsfw, locked, archived, body_snippet, ...content } = post;
+      return {
+        ...content,
+        ...(flair ? { flair } : {}),
+        ...(nsfw ? { nsfw: true } : {}),
+        ...(locked ? { locked: true } : {}),
+        ...(archived ? { archived: true } : {}),
+        ...(body_snippet ? { preview: body_snippet } : {}),
+        created: iso(created_utc),
+      };
+    }),
+  };
+}
+
+export function presentSubreddits(result: { subreddits: SubredditSummary[]; after: string | null }): unknown {
+  return {
+    subreddits: result.subreddits.map((subreddit) => {
+      const { nsfw, ...content } = subreddit;
+      return { ...content, ...(nsfw ? { nsfw: true } : {}) };
+    }),
+    after: result.after,
   };
 }
 
@@ -35,20 +52,24 @@ export async function presentSubredditInfo(info: SubredditFull): Promise<unknown
     active_users: info.active_users,
     created: iso(info.created_utc),
     type: info.type,
-    nsfw: info.nsfw,
+    ...(info.nsfw ? { nsfw: true } : {}),
     url: info.url,
     files: { sidebar: sidebarPath, rules: rulesPath },
   };
 }
 
 function presentComment(comment: Comment): unknown {
+  const replies = comment.replies.map(presentComment);
   return {
-    ...comment,
+    id: comment.id,
+    author: comment.author,
+    body: comment.body,
+    score: comment.score,
+    depth: comment.depth,
     created: iso(comment.created_utc),
-    created_utc: undefined,
-    edited: comment.edited_utc === null ? null : iso(comment.edited_utc),
-    edited_utc: undefined,
-    replies: comment.replies.map(presentComment),
+    ...(comment.edited_utc === null ? {} : { edited: iso(comment.edited_utc) }),
+    ...(replies.length ? { replies } : {}),
+    ...(comment.more_replies ? { more_replies: comment.more_replies } : {}),
   };
 }
 

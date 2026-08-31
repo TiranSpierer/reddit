@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { containsComment, extractPostId, normalizeCommentId, normalizeSubreddit, toPostSummary } from "../packages/core/dist/index.js";
-import { presentListing } from "../packages/output/dist/index.js";
+import { containsComment, extractPostId, normalizeCommentId, normalizeSubreddit, postPreview, toPostSummary } from "../packages/core/dist/index.js";
+import { presentListing, presentSubreddits } from "../packages/output/dist/index.js";
 
 function cli(...args) {
   return spawnSync(process.execPath, ["packages/cli/dist/cli.js", ...args], { encoding: "utf8" });
@@ -49,11 +49,33 @@ test("post summaries use readable timestamps", () => {
     author: "person", score: 1, upvote_ratio: 1, num_comments: 2,
     created_utc: 0, edited: false, link_flair_text: null, over_18: false,
     spoiler: false, locked: false, archived: false, is_self: true, is_video: false,
-    selftext: "Body", all_awardings: [],
+    selftext: "Line one &amp;\nline two", all_awardings: [],
   });
   assert.equal(summary.title, "Title & details");
+  assert.equal(summary.body_snippet, "Line one & line two");
   const presented = presentListing({ posts: [summary], after: null });
   assert.equal(presented.posts[0].created, "1970-01-01T00:00:00.000Z");
+  assert.equal(presented.posts[0].preview, "Line one & line two");
+  for (const key of ["flair", "nsfw", "locked", "archived", "body_snippet"]) {
+    assert.equal(Object.hasOwn(presented.posts[0], key), false);
+  }
+});
+
+test("post previews are one line and end cleanly", () => {
+  const preview = postPreview(`${"word ".repeat(60)}finish`);
+  assert.equal(preview.includes("\n"), false);
+  assert.equal(preview.endsWith("…"), true);
+  assert.ok(preview.length <= 201);
+});
+
+test("subreddit summaries only expose NSFW status when true", () => {
+  const base = { name: "one", display_name: "r/one", title: "One", description: "", subscribers: 1, active_users: 0, type: "public" };
+  const presented = presentSubreddits({
+    subreddits: [{ ...base, nsfw: false }, { ...base, name: "two", nsfw: true }],
+    after: null,
+  });
+  assert.equal(Object.hasOwn(presented.subreddits[0], "nsfw"), false);
+  assert.equal(presented.subreddits[1].nsfw, true);
 });
 
 test("focused comment validation searches nested replies", () => {

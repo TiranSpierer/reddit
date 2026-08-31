@@ -5,7 +5,7 @@ import {
   subredditInfo, subredditPosts, type CommentSort, type FeedSort,
   type SearchSort, type TimeWindow,
 } from "@tiranspierer/reddit-core";
-import { presentListing, presentSubredditInfo, presentThread, toYaml } from "@tiranspierer/reddit-output";
+import { presentListing, presentSubredditInfo, presentSubreddits, presentThread, toYaml } from "@tiranspierer/reddit-output";
 
 const SEARCH_SORTS = ["relevance", "hot", "top", "new", "comments"] as const;
 const FEED_SORTS = ["hot", "new", "top", "rising", "controversial"] as const;
@@ -65,7 +65,7 @@ export function buildProgram(): Command {
   const find = addDebug(addPaging(subreddit.command("find")
     .description("Find subreddits by name or topic.")
     .argument("<query>", "community search query")));
-  find.action((query: string, options, command: Command) => output(command, () => findSubreddits(query, options)));
+  find.action((query: string, options, command: Command) => output(command, async () => presentSubreddits(await findSubreddits(query, options))));
 
   const info = addDebug(subreddit.command("info")
     .description("Show subreddit metadata and save its sidebar and rules.")

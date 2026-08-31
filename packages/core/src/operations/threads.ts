@@ -1,7 +1,8 @@
 import { reddit } from "../client.js";
 import {
   type RawPost, type RawComment, type RawMoreStub, type RawListing,
-  type CommentsResponse, type Comment, toPostFull, extractPostId, normalizeCommentId, RedditError,
+  type CommentsResponse, type Comment, toPostFull, extractPostId, normalizeCommentId,
+  decodeRedditText, RedditError,
 } from "../types.js";
 
 export type CommentSort = "best" | "top" | "new" | "controversial" | "old" | "qa";
@@ -24,7 +25,7 @@ function parseCommentTree(
     items.push({
       id: raw.id,
       author: raw.author,
-      body: raw.body,
+      body: decodeRedditText(raw.body),
       score: raw.score,
       created_utc: raw.created_utc,
       edited_utc: raw.edited === false ? null : raw.edited,

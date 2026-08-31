@@ -238,6 +238,19 @@ function resolveUrl(url: string): string {
   return url;
 }
 
+export function decodeRedditText(value: string): string {
+  return decode(value);
+}
+
+export function postPreview(value: string, maxLength = 200): string {
+  const text = decodeRedditText(value).split(/\s+/).filter(Boolean).join(" ");
+  if (text.length <= maxLength) return text;
+  const candidate = text.slice(0, maxLength + 1);
+  const wordBoundary = candidate.lastIndexOf(" ");
+  const end = wordBoundary > maxLength / 2 ? wordBoundary : maxLength;
+  return `${text.slice(0, end).trimEnd()}…`;
+}
+
 export function toPostSummary(raw: RawPost): PostSummary {
   const base = "https://www.reddit.com";
   return {
@@ -255,7 +268,7 @@ export function toPostSummary(raw: RawPost): PostSummary {
     nsfw: raw.over_18,
     locked: raw.locked,
     archived: raw.archived,
-    body_snippet: raw.is_self ? raw.selftext.slice(0, 300) : "",
+    body_snippet: raw.is_self ? postPreview(raw.selftext) : "",
   };
 }
 
@@ -278,7 +291,7 @@ export function toPostFull(raw: RawPost): Omit<PostFull, "comments"> {
     locked: raw.locked,
     archived: raw.archived,
     is_video: raw.is_video,
-    body: raw.selftext || raw.crosspost_parent_list?.[0]?.selftext || "",
+    body: decodeRedditText(raw.selftext || raw.crosspost_parent_list?.[0]?.selftext || ""),
     awards: raw.all_awardings.map((a) => ({ name: a.name, count: a.count })),
   };
 }

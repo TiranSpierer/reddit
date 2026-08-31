@@ -3,7 +3,7 @@ import {
   findSubreddits, getThread, searchReddit, searchSubreddit,
   subredditInfo, subredditPosts,
 } from "@tiranspierer/reddit-core";
-import { presentListing, presentSubredditInfo, presentThread, toYaml } from "@tiranspierer/reddit-output";
+import { presentListing, presentSubredditInfo, presentSubreddits, presentThread, toYaml } from "@tiranspierer/reddit-output";
 
 export interface ToolDefinition {
   name: string;
@@ -35,7 +35,7 @@ export const tools: ToolDefinition[] = [
     name: "search_subreddits",
     description: "Search for subreddits by name or topic.",
     schema: z.object({ query: z.string().describe("Search query"), limit, after }),
-    handler: wrap(async ({ query, ...args }) => findSubreddits(query, args)),
+    handler: wrap(async ({ query, ...args }) => presentSubreddits(await findSubreddits(query, args))),
   },
   {
     name: "get_subreddit_info",
