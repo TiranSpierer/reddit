@@ -55,48 +55,10 @@ code --add-mcp '{"name":"reddit","command":"npx","args":["-y","-p","git+https://
 </details>
 
 <details>
-<summary>Cursor</summary>
-
-Follow the [Cursor MCP documentation](https://cursor.com/docs/mcp) and use the standard configuration above.
-
-</details>
-
-<details>
-<summary>Windsurf</summary>
-
-Follow the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/cascade/mcp) and use the standard configuration above.
-
-</details>
-
-<details>
 <summary>Antigravity</summary>
 
 ```bash
 agy mcp add reddit -- npx -y -p git+https://github.com/TiranSpierer/reddit.git reddit-mcp
-```
-
-</details>
-
-<details>
-<summary>Cline</summary>
-
-Add to `cline_mcp_settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "reddit": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "-p",
-        "git+https://github.com/TiranSpierer/reddit.git",
-        "reddit-mcp"
-      ],
-      "disabled": false
-    }
-  }
-}
 ```
 
 </details>
@@ -192,25 +154,6 @@ The MCP adapter preserves the established six tool names and input schemas. It u
 </details>
 
 <details>
-<summary><strong>Generated files</strong></summary>
-
-```text
-<os-temp>/reddit-cli/subreddits/<name>/
-├── sidebar.md
-└── rules.yml
-
-<os-temp>/reddit-cli/posts/<post-id>/
-├── post.md
-├── comments-best.yml
-├── comments-top.yml
-└── comments-<comment-id>-best.yml
-```
-
-Thread output reports `comments_saved` separately from Reddit's `total_comments`.
-
-</details>
-
-<details>
 <summary><strong>Debugging</strong></summary>
 
 Add `--debug` before or after a CLI command. Normal errors remain concise on stderr; when Reddit returned an HTTP response, its untouched body is printed to stdout. Authorization, cookies, client secrets, and OAuth tokens are never printed.
@@ -223,28 +166,9 @@ reddit-cli --debug thread missing-post
 </details>
 
 <details>
-<summary><strong>Architecture</strong></summary>
+<summary><strong>Requirements</strong></summary>
 
-```text
-packages/core    Reddit client, domain types, and operations
-packages/output  Shared YAML and deterministic file presentation
-packages/cli     Explicit Commander interface
-packages/mcp     MCP tool interface
-```
-
-The CLI and MCP adapters share Reddit behavior without sharing interface decisions.
-
-</details>
-
-<details>
-<summary><strong>Local development</strong></summary>
-
-```bash
-npm install
-npm test
-node packages/cli/dist/cli.js --help
-```
-
-Requires Node.js 20 or newer.
+- Node.js 20+
+- No Reddit API key required; OAuth credentials are optional
 
 </details>
