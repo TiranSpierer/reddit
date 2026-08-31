@@ -4,3 +4,4 @@ import { createServer } from "./server.js";
 
 const server = createServer();
 await server.connect(new StdioServerTransport());
+console.error("reddit-mcp server running on stdio");
