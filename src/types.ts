@@ -1,3 +1,5 @@
+import { decode } from "html-entities";
+
 // ─── Raw Reddit API types ────────────────────────────────────────────────────
 // Only the fields we actually use. Reddit responses have 80+ fields per object.
 
@@ -92,7 +94,7 @@ export interface PostSummary {
   score: number;
   upvote_ratio: number;
   num_comments: number;
-  created_utc: number;
+  created: string;
   flair: string | null;
   nsfw: boolean;
   locked: boolean;
@@ -110,8 +112,8 @@ export interface PostFull {
   score: number;
   upvote_ratio: number;
   num_comments: number;
-  created_utc: number;
-  edited_utc: number | null;
+  created: string;
+  edited: string | null;
   flair: string | null;
   nsfw: boolean;
   locked: boolean;
@@ -130,8 +132,8 @@ export interface Comment {
   author: string;
   body: string;
   score: number;
-  created_utc: number;
-  edited_utc: number | null;
+  created: string;
+  edited: string | null;
   depth: number;
   replies: Comment[];
   more_replies: number;
@@ -156,7 +158,7 @@ export interface SubredditFull {
   description_long: string;
   subscribers: number;
   active_users: number;
-  created_utc: number;
+  created: string;
   type: "public" | "private" | "restricted";
   nsfw: boolean;
   url: string;
@@ -166,18 +168,28 @@ export interface SubredditFull {
 // ─── Error types ──────────────────────────────────────────────────────────────
 
 export type ErrorCode =
+  | "INVALID_INPUT"
   | "NOT_FOUND"
   | "RATE_LIMITED"
   | "SUBREDDIT_PRIVATE"
   | "SUBREDDIT_BANNED"
   | "SUBREDDIT_QUARANTINED"
   | "NETWORK_ERROR"
-  | "CHALLENGE_REQUIRED";
+  | "REDDIT_ACCESS_BLOCKED";
+
+export interface RedditDebugResponse {
+  url: string;
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string;
+}
 
 export class RedditError extends Error {
   constructor(
     public readonly code: ErrorCode,
-    message: string
+    message: string,
+    public readonly debugResponse?: RedditDebugResponse,
   ) {
     super(message);
     this.name = "RedditError";
@@ -187,7 +199,11 @@ export class RedditError extends Error {
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
 export function normalizeSubreddit(input: string): string {
-  return input.replace(/^r\//, "").trim();
+  const value = input.replace(/^r\//, "").trim();
+  if (!value || value.includes("/") || value.includes("\\") || value === "." || value === "..") {
+    throw new RedditError("INVALID_INPUT", "subreddit must be a name with an optional r/ prefix");
+  }
+  return value;
 }
 
 export function extractPostId(input: string): string {
@@ -195,9 +211,20 @@ export function extractPostId(input: string): string {
   const urlMatch = input.match(/\/comments\/([a-z0-9]+)/i);
   if (urlMatch) return urlMatch[1];
   // Fullname: t3_abc123
-  if (input.startsWith("t3_")) return input.slice(3);
+  if (input.startsWith("t3_")) return validPostId(input.slice(3));
   // Bare ID
-  return input.trim();
+  return validPostId(input.trim());
+}
+
+function validPostId(value: string): string {
+  if (!/^[a-z0-9]+$/i.test(value)) throw new RedditError("INVALID_INPUT", "post must be a Reddit post ID, t3_ fullname, or Reddit URL");
+  return value;
+}
+
+export function normalizeCommentId(input: string): string {
+  const value = input.startsWith("t1_") ? input.slice(3) : input;
+  if (!/^[a-z0-9]+$/i.test(value)) throw new RedditError("INVALID_INPUT", "comment must be a Reddit comment ID or t1_ fullname");
+  return value;
 }
 
 export function normalizeSubredditType(raw: string): "public" | "private" | "restricted" {
@@ -215,7 +242,7 @@ export function toPostSummary(raw: RawPost): PostSummary {
   const base = "https://www.reddit.com";
   return {
     id: raw.id,
-    title: raw.title,
+    title: decode(raw.title),
     subreddit: raw.subreddit,
     permalink: base + raw.permalink,
     external_url: raw.is_self ? base + raw.permalink : resolveUrl(raw.url),
@@ -223,8 +250,8 @@ export function toPostSummary(raw: RawPost): PostSummary {
     score: raw.score,
     upvote_ratio: raw.upvote_ratio,
     num_comments: raw.num_comments,
-    created_utc: raw.created_utc,
-    flair: raw.link_flair_text,
+    created: new Date(raw.created_utc * 1000).toISOString(),
+    flair: raw.link_flair_text ? decode(raw.link_flair_text) : null,
     nsfw: raw.over_18,
     locked: raw.locked,
     archived: raw.archived,
@@ -236,7 +263,7 @@ export function toPostFull(raw: RawPost): Omit<PostFull, "comments"> {
   const base = "https://www.reddit.com";
   return {
     id: raw.id,
-    title: raw.title,
+    title: decode(raw.title),
     subreddit: raw.subreddit,
     permalink: base + raw.permalink,
     external_url: raw.is_self ? base + raw.permalink : resolveUrl(raw.url),
@@ -244,9 +271,9 @@ export function toPostFull(raw: RawPost): Omit<PostFull, "comments"> {
     score: raw.score,
     upvote_ratio: raw.upvote_ratio,
     num_comments: raw.num_comments,
-    created_utc: raw.created_utc,
-    edited_utc: raw.edited === false ? null : raw.edited,
-    flair: raw.link_flair_text,
+    created: new Date(raw.created_utc * 1000).toISOString(),
+    edited: raw.edited === false ? null : new Date(raw.edited * 1000).toISOString(),
+    flair: raw.link_flair_text ? decode(raw.link_flair_text) : null,
     nsfw: raw.over_18,
     locked: raw.locked,
     archived: raw.archived,
@@ -260,8 +287,8 @@ export function toSubredditSummary(raw: RawSubreddit): SubredditSummary {
   return {
     name: raw.display_name,
     display_name: `r/${raw.display_name}`,
-    title: raw.title,
-    description: raw.public_description,
+    title: decode(raw.title),
+    description: decode(raw.public_description),
     subscribers: raw.subscribers,
     active_users: raw.active_user_count,
     type: normalizeSubredditType(raw.subreddit_type),

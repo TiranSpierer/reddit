@@ -1,207 +1,76 @@
-# reddit-mcp
+# reddit-cli
 
-Recommended: install [`web-platforms`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace. The CLI is preferred over MCP for better token efficiency.
-
-Read-only Reddit MCP server. Search Reddit and read discussions without an API key.
-
-Search across Reddit or within specific communities, browse feeds, and read full discussion threads.
-
-The package also provides `reddit-cli`, generated from the same schemas and handlers as the MCP server:
-
-```bash
-npx -y git+https://github.com/TiranSpierer/reddit-mcp.git reddit-cli --help
-reddit-cli search-reddit "mechanical keyboards" --sort top --time year
-reddit-cli get-post abc123
-```
+CLI for searching and reading Reddit discussions. It supports anonymous access without an API key and optional OAuth credentials for higher rate limits.
 
 ## Install
 
-**Standard config** works in most tools:
+Recommended: install [`web-platforms`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace.
 
-```json
-{
-  "mcpServers": {
-    "reddit-mcp": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "git+https://github.com/TiranSpierer/reddit-mcp.git"
-      ]
-    }
-  }
-}
-```
+Run directly:
 
-<details>
-<summary>Claude Code</summary>
-
-Run in terminal:
 ```bash
-claude mcp add reddit-mcp -s user -- npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
+npx -y git+https://github.com/TiranSpierer/reddit-cli.git reddit-cli --help
 ```
 
-</details>
+## Commands
 
-<details>
-<summary>VS Code / Copilot</summary>
-
-Run in terminal:
 ```bash
-code --add-mcp '{"name":"reddit-mcp","command":"npx","args":["-y","git+https://github.com/TiranSpierer/reddit-mcp.git"]}'
+reddit-cli search "typescript error" --sort top --time year
+
+reddit-cli subreddit find "robot vacuum"
+reddit-cli subreddit info RobotVacuums
+reddit-cli subreddit posts RobotVacuums --sort new
+reddit-cli subreddit search RobotVacuums "budget mop"
+
+reddit-cli thread 1w391er
+reddit-cli thread <reddit-url> --comment-sort top
+reddit-cli thread 1w391er --comment p6ypqcs
 ```
 
-</details>
+Searches and feeds print compact YAML and an `after` cursor for pagination.
 
-<details>
-<summary>Codex</summary>
+`subreddit info` saves optional community material under `<os-temp>/reddit-cli/subreddits/<name>/`:
 
-Run in terminal:
+```text
+sidebar.md  Full community sidebar
+rules.yml   Community rules
+```
+
+`thread` always saves the post and selected comment discussion under `<os-temp>/reddit-cli/posts/<post-id>/`:
+
+```text
+post.md                         Post title, links, and body
+comments-best.yml               Default comment selection
+comments-top.yml                A requested sort
+comments-<comment-id>-best.yml  A focused comment subtree
+```
+
+Thread stdout reports `comments_saved` and Reddit's `total_comments`. Reddit may return fewer comments because of deleted content or unresolved `more` nodes.
+
+## Debugging
+
+Add `--debug` before or after a command. Normal errors remain concise on stderr; when Reddit returned an HTTP response, its untouched body is printed to stdout. Authorization, cookies, client secrets, and OAuth tokens are never printed.
+
 ```bash
-codex mcp add reddit-mcp npx "-y" "git+https://github.com/TiranSpierer/reddit-mcp.git"
+reddit-cli subreddit info missing-community --debug
+reddit-cli --debug thread missing-post
 ```
 
-</details>
+## Optional OAuth
 
-<details>
-<summary>Cursor</summary>
+Set both variables to use Reddit's client-credentials API instead of anonymous access:
 
-Follow the [Cursor MCP docs](https://cursor.com/docs/mcp). Use the standard config above.
-
-</details>
-
-<details>
-<summary>Windsurf</summary>
-
-Follow the [Windsurf MCP docs](https://docs.windsurf.com/windsurf/cascade/mcp). Use the standard config above.
-
-</details>
-
-<details>
-<summary>Antigravity</summary>
-
-Run in terminal:
-```bash
-agy mcp add reddit-mcp -- npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
+```text
+REDDIT_CLIENT_ID
+REDDIT_CLIENT_SECRET
 ```
 
-</details>
-
-<details>
-<summary>Cline</summary>
-
-Follow the [Cline MCP docs](https://docs.cline.bot/mcp/configuring-mcp-servers). Add to `cline_mcp_settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "reddit-mcp": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "git+https://github.com/TiranSpierer/reddit-mcp.git"
-      ],
-      "disabled": false
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary>Authenticated mode (optional)</summary>
-
-If you have Reddit API credentials, add them as environment variables for higher rate limits:
-
-```json
-{
-  "mcpServers": {
-    "reddit-mcp": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "git+https://github.com/TiranSpierer/reddit-mcp.git"
-      ],
-      "env": {
-        "REDDIT_CLIENT_ID": "your_client_id",
-        "REDDIT_CLIENT_SECRET": "your_client_secret"
-      }
-    }
-  }
-}
-```
-
-Claude Code:
-```bash
-claude mcp add reddit-mcp -s user \
-  -e REDDIT_CLIENT_ID=your_client_id \
-  -e REDDIT_CLIENT_SECRET=your_client_secret \
-  -- npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
-```
-
-Antigravity:
-```bash
-agy mcp add \
-  -e REDDIT_CLIENT_ID=your_client_id \
-  -e REDDIT_CLIENT_SECRET=your_client_secret \
-  reddit-mcp -- npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
-```
-
-To get credentials, submit a request through Reddit's [developer form](https://support.reddithelp.com/hc/en-us/requests/new?ticket_form_id=14868593862164&tf_14867328473236=api_request_type_enterprise). See their [API access policy](https://support.reddithelp.com/hc/articles/42728983564564) for details.
-
-</details>
-
----
-
-<details>
-<summary><strong>Tools</strong></summary>
-
-| Tool | Description |
-|---|---|
-| `search_reddit` | Search posts across all of Reddit |
-| `search_subreddits` | Find communities by topic |
-| `get_subreddit_info` | Subreddit metadata and rules |
-| `get_subreddit_posts` | Browse a subreddit feed (hot/new/top/rising/controversial) |
-| `search_subreddit_posts` | Search posts within a specific subreddit |
-| `get_post` | Read a post's full content and comment tree |
-
-See [docs/TOOLS.md](docs/TOOLS.md) for full parameter and return type documentation.
-
-</details>
-
-<details>
-<summary><strong>Usage examples</strong></summary>
-
-- Search Reddit broadly or within specific communities
-- Discover which subreddits cover a topic
-- Browse what a community is currently discussing
-- Read a full post and its comment thread
-- Paginate through results and drill into nested reply chains
-
-While originally designed for researching errors and technical problems, it works for any read-only Reddit use case — news, opinions, recommendations, community sentiment, or anything else people discuss on Reddit.
-
-</details>
-
-<details>
-<summary><strong>Rate limits</strong></summary>
-
-100 requests per 10 minutes (Reddit's standard limit). The server tracks rate limit headers automatically and backs off when the limit is approached.
-
-</details>
-
-<details>
-<summary><strong>Local development</strong></summary>
+## Development
 
 ```bash
 npm install
-npm run build
+npm test
+node dist/cli.js --help
 ```
 
-Register the dev server (run from repo root):
-```bash
-claude mcp add reddit-mcp-dev -s project -- node dist/index.js
-```
-
-After making changes, run `npm run build` and reload Claude for the new code to take effect.
-
-</details>
+Requires Node.js 20 or newer.

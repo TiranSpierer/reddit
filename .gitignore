@@ -3,7 +3,6 @@ node_modules/
 
 # Build output
 dist/
-.playwright-mcp/
 
 # Temp / reference files
 temp/
@@ -19,5 +18,5 @@ temp/
 .vscode/
 .idea/
 
-# MCP local config
+# Legacy local configuration
 .mcp.json

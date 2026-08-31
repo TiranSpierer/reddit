@@ -1,66 +1,40 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## What This Is
-
-A read-only MCP server and CLI for Reddit. Provides 6 tools for searching Reddit, discovering subreddits, browsing feeds, and reading full post/comment trees. Supports two access modes: OAuth (when `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` env vars are set) or anonymous (no credentials needed).
+TypeScript CLI for searching and reading Reddit discussions. Anonymous access works without credentials; OAuth client credentials are optional.
 
 ## Commands
 
 ```bash
-npm install          # Install deps + auto-builds via prepare script
-npm run build        # Compile TypeScript (tsc) → dist/
-npm run dev          # Watch mode (tsc --watch)
+npm install
+npm test
+node dist/cli.js --help
 ```
-
-No linter or formatter is configured.
-
-### Smoke Testing
-
-Run `/smoke-test` to exercise all tools with happy paths and edge cases. The skill builds the project, kills the running MCP server process (Claude Code auto-respawns it with the fresh build), then calls all tools directly via `mcp__reddit-mcp-dev__*`.
-
-The `reddit-mcp-dev` MCP server is registered in `.mcp.json` (project scope). It points to `dist/index.js`.
-
-### Quick Self-Testing
-
-To test a specific change without the full smoke test:
-
-```bash
-npm run build && pkill -f "node.*reddit-mcp/dist/index.js"
-```
-
-Then call the relevant `mcp__reddit-mcp-dev__*` tool directly to verify the change.
 
 ## Architecture
 
-**ES Modules project** (`"type": "module"`) using TypeScript (target ES2022, module ESNext). Output goes to `dist/`.
+- `client.ts` is the single HTTP boundary. It owns OAuth tokens, anonymous cookies, the known automatic challenge flow, rate limits, retries, error classification, and sanitized debug responses.
+- `core/search.ts` contains global and subreddit-scoped post search.
+- `core/subreddits.ts` contains community discovery, metadata, saved sidebar/rules, and feeds.
+- `core/threads.ts` fetches the fullest practical comment tree, maps nested comments, and saves deterministic post/comment files.
+- `types.ts` contains lean Reddit response types, clean output mappers, identifiers, and typed errors.
+- `files.ts` writes files atomically below the OS temporary directory.
+- `cli.ts` explicitly defines Commander commands, choices, rendering, debug behavior, and exit codes.
 
-### Source Layout (src/)
+Core operations return structured values and throw `RedditError`. Commander and stdout/stderr behavior belong only in `cli.ts`.
 
-- **index.ts** / **server.ts** — stdio entry point and MCP registration, including the `reddit://api-behavior` resource.
-- **tools/index.ts** — single registry of tool schemas and handlers shared by MCP and CLI. Anonymous mode also adds `solve_reddit_challenge`.
-- **cli.ts** / **cli-gen.ts** — schema-generated `reddit-cli` commands over the same handlers.
+## Invariants
 
-- **client.ts** — Singleton `RedditClient` (exported as `reddit`). Two access paths selected at startup based on env vars:
-  - **OAuth path** (env `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET`): fetches a bearer token via client-credentials grant, sends requests to `oauth.reddit.com`, auto-refreshes on 401.
-  - **Anonymous path** (no env vars): solves Reddit's JS challenge to obtain session cookies, sends requests to `www.reddit.com/.json`. On 403, clears cookies and re-solves once. If the challenge format changes and auto-parsing fails, throws `CHALLENGE_REQUIRED` so the LLM can solve it via the `solve_reddit_challenge` tool (only registered in anonymous mode).
-  
-  Both paths share rate-limit tracking (`x-ratelimit-*` headers, sleep when exhausted, retry once on 429) and the same error classification for 403/404.
+- Route all Reddit requests through `client.ts`.
+- Never print request authorization, cookies, client secrets, or OAuth tokens.
+- `--debug` prints only an untouched failed response body; normal errors stay concise on stderr.
+- Search/feed results remain bounded stdout YAML and retain Reddit cursors.
+- Subreddit sidebars/rules and thread bodies/comments are always saved to deterministic files.
+- A thread reports actual recursively saved comments separately from Reddit's reported total.
+- Different comment sorts and focused subtrees use different filenames.
+- The known anonymous challenge is automatic. Unknown challenge formats fail clearly as `REDDIT_ACCESS_BLOCKED`; there is no manual solver command.
 
-- **types.ts** — Two type layers: raw types matching Reddit's API shape (`RawPost`, `RawComment`, etc.) and clean output types returned to MCP clients (`PostSummary`, `PostFull`, `Comment`, etc.). Also contains `RedditError` (typed `code` field: `NOT_FOUND`, `RATE_LIMITED`, `SUBREDDIT_PRIVATE`, `CHALLENGE_REQUIRED`, etc.) and helper functions (`normalizeSubreddit`, `extractPostId`, `toPostSummary`, etc.).
+## Changes
 
-- **tools/search.ts** — `searchReddit`, `searchSubredditPosts` → return `{ posts: PostSummary[], after }`.
-- **tools/subreddits.ts** — `searchSubreddits`, `getSubredditInfo` (two sequential requests: about + rules, with quarantine check), `getSubredditPosts`.
-- **tools/posts.ts** — `getPost` with recursive `parseCommentTree` that counts truncated subtrees into `more_replies`/`more_count`. Supports focused subtree via `comment_id`.
-
-### Key Patterns
-
-- All Reddit API interaction goes through the singleton `reddit` client in `client.ts` — never call `fetch` directly.
-- Auth mode is decided once at import time: if `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` are set, OAuth is used; otherwise anonymous.
-- Rate limit: tracked automatically by the client from response headers.
-- The `bin` field in package.json points to `dist/index.js` (has shebang), enabling `npx` installation.
-
-### Dependencies
-
-Three runtime deps: `@modelcontextprotocol/sdk` (MCP framework), `zod` (input validation), and `yaml` (YAML serialization for token-efficient tool output).
+- Keep HTTP, core operations, filesystem output, and CLI parsing separate.
+- Update README and `docs/CLI.md` for user-visible behavior.
+- Run `npm test` and representative live commands before committing.
