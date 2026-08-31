@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { containsComment } from "../dist/core/threads.js";
-import { extractPostId, normalizeCommentId, normalizeSubreddit, toPostSummary } from "../dist/types.js";
+import { containsComment, extractPostId, normalizeCommentId, normalizeSubreddit, toPostSummary } from "../packages/core/dist/index.js";
+import { presentListing } from "../packages/output/dist/index.js";
 
 function cli(...args) {
-  return spawnSync(process.execPath, ["dist/cli.js", ...args], { encoding: "utf8" });
+  return spawnSync(process.execPath, ["packages/cli/dist/cli.js", ...args], { encoding: "utf8" });
 }
 
 test("top-level help exposes the resource-oriented CLI", () => {
@@ -51,8 +51,9 @@ test("post summaries use readable timestamps", () => {
     spoiler: false, locked: false, archived: false, is_self: true, is_video: false,
     selftext: "Body", all_awardings: [],
   });
-  assert.equal(summary.created, "1970-01-01T00:00:00.000Z");
   assert.equal(summary.title, "Title & details");
+  const presented = presentListing({ posts: [summary], after: null });
+  assert.equal(presented.posts[0].created, "1970-01-01T00:00:00.000Z");
 });
 
 test("focused comment validation searches nested replies", () => {

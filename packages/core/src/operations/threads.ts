@@ -1,7 +1,4 @@
-import { join } from "node:path";
 import { reddit } from "../client.js";
-import { atomicWrite, threadDirectory } from "../files.js";
-import { toYaml } from "../format.js";
 import {
   type RawPost, type RawComment, type RawMoreStub, type RawListing,
   type CommentsResponse, type Comment, toPostFull, extractPostId, normalizeCommentId, RedditError,
@@ -29,8 +26,8 @@ function parseCommentTree(
       author: raw.author,
       body: raw.body,
       score: raw.score,
-      created: new Date(raw.created_utc * 1000).toISOString(),
-      edited: raw.edited === false ? null : new Date(raw.edited * 1000).toISOString(),
+      created_utc: raw.created_utc,
+      edited_utc: raw.edited === false ? null : raw.edited,
       depth,
       replies: replies.items,
       more_replies: replies.moreCount,
@@ -47,62 +44,48 @@ export function containsComment(comments: Comment[], id: string): boolean {
   return comments.some((comment) => comment.id === id || containsComment(comment.replies, id));
 }
 
-function postMarkdown(post: ReturnType<typeof toPostFull>): string {
-  const links = [
-    `Reddit: ${post.permalink}`,
-    ...(post.external_url !== post.permalink ? [`External link: ${post.external_url}`] : []),
-  ];
-  return `# ${post.title}\n\n${links.join("\n")}\n\n${post.body || "(No text body.)"}\n`;
+export interface ThreadResult {
+  post: ReturnType<typeof toPostFull>;
+  comments: Comment[];
+  commentsSaved: number;
+  moreCount: number;
+  sort: CommentSort;
+  commentId?: string;
+  includeComments: boolean;
+  commentLimit?: number;
+  commentDepth?: number;
 }
 
 export async function getThread(
   value: string,
-  args: { commentSort?: CommentSort; commentId?: string } = {},
-): Promise<unknown> {
+  args: { includeComments?: boolean; commentSort?: CommentSort; commentId?: string; commentLimit?: number; commentDepth?: number } = {},
+): Promise<ThreadResult> {
   const id = extractPostId(value);
   const sort = args.commentSort ?? "best";
+  const includeComments = args.includeComments !== false;
   const commentId = args.commentId ? normalizeCommentId(args.commentId) : undefined;
   const response = await reddit.get<CommentsResponse>(`/comments/${id}.json`, {
     sort,
-    limit: 500,
-    depth: 10,
+    limit: includeComments ? (args.commentLimit ?? 500) : 0,
+    depth: args.commentDepth ?? 10,
     ...(commentId ? { comment: commentId } : {}),
   });
   const rawPost = response[0].data.children[0]?.data as RawPost | undefined;
   if (!rawPost) throw new RedditError("NOT_FOUND", `Post not found: ${value}`);
   const post = toPostFull(rawPost);
-  const parsed = parseCommentTree(response[1].data.children);
+  const parsed = includeComments ? parseCommentTree(response[1].data.children) : { items: [], moreCount: 0 };
   if (commentId && !containsComment(parsed.items, commentId)) {
     throw new RedditError("NOT_FOUND", `Comment not found in post ${id}: ${commentId}`);
   }
-  const commentsSaved = countComments(parsed.items);
-  const directory = threadDirectory(id);
-  const postPath = join(directory, "post.md");
-  const selection = `${commentId ? `${commentId}-` : ""}${sort}`;
-  const commentsPath = join(directory, `comments-${selection}.yml`);
-  await Promise.all([
-    atomicWrite(postPath, postMarkdown(post)),
-    atomicWrite(commentsPath, toYaml({
-      post_id: id,
-      sort,
-      ...(commentId ? { comment_id: commentId } : {}),
-      comments_saved: commentsSaved,
-      total_comments: post.num_comments,
-      more_count: parsed.moreCount,
-      comments: parsed.items,
-    })),
-  ]);
   return {
-    id: post.id,
-    title: post.title,
-    subreddit: post.subreddit,
-    author: post.author,
-    score: post.score,
-    comments_saved: commentsSaved,
-    total_comments: post.num_comments,
-    created: post.created,
-    url: post.permalink,
-    comment_selection: { sort, ...(commentId ? { comment_id: commentId } : {}) },
-    files: { post: postPath, comments: commentsPath },
+    post,
+    comments: parsed.items,
+    commentsSaved: countComments(parsed.items),
+    moreCount: parsed.moreCount,
+    sort,
+    includeComments,
+    ...(commentId ? { commentId } : {}),
+    ...(args.commentLimit ? { commentLimit: args.commentLimit } : {}),
+    ...(args.commentDepth ? { commentDepth: args.commentDepth } : {}),
   };
 }

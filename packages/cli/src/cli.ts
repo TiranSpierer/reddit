@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { Command, Option } from "commander";
-import { searchReddit, searchSubreddit, type SearchSort, type TimeWindow } from "./core/search.js";
-import { findSubreddits, subredditInfo, subredditPosts, type FeedSort } from "./core/subreddits.js";
-import { getThread, type CommentSort } from "./core/threads.js";
-import { toYaml } from "./format.js";
-import { RedditError } from "./types.js";
+import {
+  findSubreddits, getThread, RedditError, searchReddit, searchSubreddit,
+  subredditInfo, subredditPosts, type CommentSort, type FeedSort,
+  type SearchSort, type TimeWindow,
+} from "@tiranspierer/reddit-core";
+import { presentListing, presentSubredditInfo, presentThread, toYaml } from "@tiranspierer/reddit-output";
 
 const SEARCH_SORTS = ["relevance", "hot", "top", "new", "comments"] as const;
 const FEED_SORTS = ["hot", "new", "top", "rising", "controversial"] as const;
@@ -54,13 +55,9 @@ export function buildProgram(): Command {
   const globalSearch = addDebug(addPaging(addSearchSelection(program.command("search")
     .description("Search posts across Reddit.")
     .argument("<query>", "search query"))));
-  globalSearch.action((query: string, options, command: Command) => output(command, () => searchReddit({
-    query,
-    sort: options.sort as SearchSort,
-    time: options.time as TimeWindow,
-    limit: options.limit,
-    after: options.after,
-  })));
+  globalSearch.action((query: string, options, command: Command) => output(command, async () => presentListing(await searchReddit({
+    query, sort: options.sort as SearchSort, time: options.time as TimeWindow, limit: options.limit, after: options.after,
+  }))));
 
   const subreddit = addDebug(program.command("subreddit").description("Find and inspect Reddit communities."));
   subreddit.action(() => subreddit.help());
@@ -73,31 +70,31 @@ export function buildProgram(): Command {
   const info = addDebug(subreddit.command("info")
     .description("Show subreddit metadata and save its sidebar and rules.")
     .argument("<subreddit>", "subreddit name, with or without r/"));
-  info.action((name: string, _options, command: Command) => output(command, () => subredditInfo(name)));
+  info.action((name: string, _options, command: Command) => output(command, async () => presentSubredditInfo(await subredditInfo(name))));
 
   const posts = addDebug(addPaging(subreddit.command("posts")
     .description("Browse a subreddit feed.")
     .argument("<subreddit>", "subreddit name, with or without r/")
     .addOption(new Option("--sort <order>", "feed order").choices([...FEED_SORTS]).default("hot"))
     .addOption(new Option("--time <window>", "time window for top or controversial").choices([...TIMES]).default("day"))));
-  posts.action((name: string, options, command: Command) => output(command, () => subredditPosts(name, {
+  posts.action((name: string, options, command: Command) => output(command, async () => presentListing(await subredditPosts(name, {
     sort: options.sort as FeedSort,
     time: options.time as TimeWindow,
     limit: options.limit,
     after: options.after,
-  })));
+  }))));
 
   const subredditSearch = addDebug(addPaging(addSearchSelection(subreddit.command("search")
     .description("Search posts within a subreddit.")
     .argument("<subreddit>", "subreddit name, with or without r/")
     .argument("<query>", "search query"))));
-  subredditSearch.action((name: string, query: string, options, command: Command) => output(command, () => searchSubreddit(name, {
+  subredditSearch.action((name: string, query: string, options, command: Command) => output(command, async () => presentListing(await searchSubreddit(name, {
     query,
     sort: options.sort as SearchSort,
     time: options.time as TimeWindow,
     limit: options.limit,
     after: options.after,
-  })));
+  }))));
 
   const thread = addDebug(program.command("thread")
     .description("Save a Reddit post and its comment discussion.")
@@ -105,10 +102,10 @@ export function buildProgram(): Command {
     .addOption(new Option("--comment-sort <order>", "comment order").choices([...COMMENT_SORTS]).default("best"))
     .option("--comment <id>", "save only a focused comment subtree"));
   thread.addHelpText("after", "\nSaves post.md and the selected comments to the OS temporary directory. By default requests Reddit's fullest practical comment tree.\n");
-  thread.action((value: string, options, command: Command) => output(command, () => getThread(value, {
+  thread.action((value: string, options, command: Command) => output(command, async () => presentThread(await getThread(value, {
     commentSort: options.commentSort as CommentSort,
     commentId: options.comment,
-  })));
+  }))));
 
   return program;
 }

@@ -1,0 +1,16 @@
+{
+  "name": "reddit-cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "reddit-cli": "dist/cli.js" },
+  "scripts": {
+    "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsc && node -e \"require('fs').chmodSync('dist/cli.js',0o755)\""
+  },
+  "dependencies": {
+    "@tiranspierer/reddit-core": "1.0.0",
+    "@tiranspierer/reddit-output": "1.0.0",
+    "commander": "^14.0.0"
+  }
+}

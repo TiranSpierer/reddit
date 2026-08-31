@@ -1,15 +1,15 @@
-# reddit-cli
+# Reddit
 
-CLI for searching and reading Reddit discussions. It supports anonymous access without an API key and optional OAuth credentials for higher rate limits.
+Shared Reddit core with separate CLI and MCP adapters. Both support anonymous access without an API key and optional OAuth credentials for higher rate limits.
 
 ## Install
 
-Recommended: install [`web-platforms`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace.
+Recommended: install [`web-platforms`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace. The CLI is preferred for agent workflows and token-efficient file output.
 
 Run directly:
 
 ```bash
-npx -y git+https://github.com/TiranSpierer/reddit-cli.git reddit-cli --help
+npx -y -p git+https://github.com/TiranSpierer/reddit.git reddit-cli --help
 ```
 
 ## Commands
@@ -70,7 +70,39 @@ REDDIT_CLIENT_SECRET
 ```bash
 npm install
 npm test
-node dist/cli.js --help
+node packages/cli/dist/cli.js --help
 ```
 
 Requires Node.js 20 or newer.
+
+## MCP compatibility
+
+Existing MCP installations continue to use the original command:
+
+```bash
+npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
+```
+
+Manual configuration:
+
+```json
+{
+  "mcpServers": {
+    "reddit": {
+      "command": "npx",
+      "args": ["-y", "git+https://github.com/TiranSpierer/reddit-mcp.git"]
+    }
+  }
+}
+```
+
+The MCP adapter preserves the established six tool names and input schemas. Large subreddit and thread content uses the same deterministic local files and compact summaries as the CLI.
+
+## Repository layout
+
+```text
+packages/core    Reddit client, domain types, and operations
+packages/output  Shared YAML and deterministic file presentation
+packages/cli     Explicit Commander interface
+packages/mcp     Legacy MCP tool interface
+```

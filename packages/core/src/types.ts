@@ -94,7 +94,7 @@ export interface PostSummary {
   score: number;
   upvote_ratio: number;
   num_comments: number;
-  created: string;
+  created_utc: number;
   flair: string | null;
   nsfw: boolean;
   locked: boolean;
@@ -112,8 +112,8 @@ export interface PostFull {
   score: number;
   upvote_ratio: number;
   num_comments: number;
-  created: string;
-  edited: string | null;
+  created_utc: number;
+  edited_utc: number | null;
   flair: string | null;
   nsfw: boolean;
   locked: boolean;
@@ -132,8 +132,8 @@ export interface Comment {
   author: string;
   body: string;
   score: number;
-  created: string;
-  edited: string | null;
+  created_utc: number;
+  edited_utc: number | null;
   depth: number;
   replies: Comment[];
   more_replies: number;
@@ -158,7 +158,7 @@ export interface SubredditFull {
   description_long: string;
   subscribers: number;
   active_users: number;
-  created: string;
+  created_utc: number;
   type: "public" | "private" | "restricted";
   nsfw: boolean;
   url: string;
@@ -250,7 +250,7 @@ export function toPostSummary(raw: RawPost): PostSummary {
     score: raw.score,
     upvote_ratio: raw.upvote_ratio,
     num_comments: raw.num_comments,
-    created: new Date(raw.created_utc * 1000).toISOString(),
+    created_utc: raw.created_utc,
     flair: raw.link_flair_text ? decode(raw.link_flair_text) : null,
     nsfw: raw.over_18,
     locked: raw.locked,
@@ -271,8 +271,8 @@ export function toPostFull(raw: RawPost): Omit<PostFull, "comments"> {
     score: raw.score,
     upvote_ratio: raw.upvote_ratio,
     num_comments: raw.num_comments,
-    created: new Date(raw.created_utc * 1000).toISOString(),
-    edited: raw.edited === false ? null : new Date(raw.edited * 1000).toISOString(),
+    created_utc: raw.created_utc,
+    edited_utc: raw.edited === false ? null : raw.edited,
     flair: raw.link_flair_text ? decode(raw.link_flair_text) : null,
     nsfw: raw.over_18,
     locked: raw.locked,

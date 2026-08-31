@@ -1,11 +1,8 @@
-import { join } from "node:path";
 import { decode } from "html-entities";
 import { reddit } from "../client.js";
-import { atomicWrite, subredditDirectory } from "../files.js";
-import { toYaml } from "../format.js";
 import {
   type RawPost, type RawSubreddit, type RawListing, type RawRulesResponse,
-  type PostSummary, type SubredditSummary, toPostSummary, toSubredditSummary,
+  type PostSummary, type SubredditSummary, type SubredditFull, toPostSummary, toSubredditSummary,
   normalizeSubreddit, normalizeSubredditType, RedditError,
 } from "../types.js";
 import type { TimeWindow } from "./search.js";
@@ -22,22 +19,13 @@ export async function findSubreddits(query: string, args: PageArgs = {}): Promis
   };
 }
 
-export async function subredditInfo(subreddit: string): Promise<unknown> {
+export async function subredditInfo(subreddit: string): Promise<SubredditFull> {
   const name = normalizeSubreddit(subreddit);
   const about = await reddit.get<{ kind: string; data: RawSubreddit }>(`/r/${name}/about.json`);
   if ((about.data as unknown as Record<string, unknown>).quarantine === true) {
     throw new RedditError("SUBREDDIT_QUARANTINED", `r/${name} is quarantined`);
   }
   const rules = await reddit.get<RawRulesResponse>(`/r/${name}/about/rules.json`);
-  const directory = subredditDirectory(about.data.display_name);
-  const sidebarPath = join(directory, "sidebar.md");
-  const rulesPath = join(directory, "rules.yml");
-  await Promise.all([
-    atomicWrite(sidebarPath, `${about.data.description.trim()}\n`),
-    atomicWrite(rulesPath, toYaml((rules.rules ?? []).map((rule) => ({
-      name: rule.short_name, description: rule.description,
-    })))),
-  ]);
   return {
     name: about.data.display_name,
     display_name: `r/${about.data.display_name}`,
@@ -45,11 +33,12 @@ export async function subredditInfo(subreddit: string): Promise<unknown> {
     description: decode(about.data.public_description),
     subscribers: about.data.subscribers,
     active_users: about.data.active_user_count,
-    created: new Date(about.data.created_utc * 1000).toISOString(),
+    created_utc: about.data.created_utc,
     type: normalizeSubredditType(about.data.subreddit_type),
     nsfw: about.data.over18,
     url: `https://www.reddit.com${about.data.url}`,
-    files: { sidebar: sidebarPath, rules: rulesPath },
+    description_long: about.data.description,
+    rules: (rules.rules ?? []).map((rule) => ({ short_name: rule.short_name, description: rule.description })),
   };
 }
 

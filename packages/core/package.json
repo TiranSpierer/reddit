@@ -1,0 +1,16 @@
+{
+  "name": "@tiranspierer/reddit-core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": "./dist/index.js",
+  "scripts": {
+    "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "html-entities": "^2.6.0"
+  }
+}
