@@ -1,6 +1,6 @@
 {
   "name": "@tiranspierer/reddit-mcp",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "bin": { "reddit-mcp": "dist/index.js" },
@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@tiranspierer/reddit-core": "1.0.0",
-    "@tiranspierer/reddit-output": "1.0.0",
+    "@tiranspierer/reddit-core": "2.0.0",
+    "@tiranspierer/reddit-output": "2.0.0",
     "zod": "^4.0.0"
   }
 }

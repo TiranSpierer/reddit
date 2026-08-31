@@ -2,6 +2,8 @@
 
 TypeScript monorepo with a shared Reddit core and separate CLI and MCP adapters. Anonymous access works without credentials; OAuth client credentials are optional.
 
+The neutral root package exposes two explicit binaries, `reddit-cli` and `reddit-mcp`; do not rely on npm executable inference.
+
 ## Commands
 
 ```bash

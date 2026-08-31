@@ -2,6 +2,20 @@
 
 Shared Reddit core with separate CLI and MCP adapters. Both support anonymous access without an API key and optional OAuth credentials for higher rate limits.
 
+## Migrating to v2
+
+The repository now contains separate MCP and CLI packages. Replace the previous implicit command:
+
+```text
+npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
+```
+
+with an explicit MCP binary:
+
+```bash
+npx -y -p git+https://github.com/TiranSpierer/reddit.git reddit-mcp
+```
+
 ## Install
 
 Recommended: install [`web-platforms`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace. The CLI is preferred for agent workflows and token-efficient file output.
@@ -75,12 +89,12 @@ node packages/cli/dist/cli.js --help
 
 Requires Node.js 20 or newer.
 
-## MCP compatibility
+## MCP
 
-Existing MCP installations continue to use the original command:
+Run the MCP adapter explicitly:
 
 ```bash
-npx -y git+https://github.com/TiranSpierer/reddit-mcp.git
+npx -y -p git+https://github.com/TiranSpierer/reddit.git reddit-mcp
 ```
 
 Manual configuration:
@@ -90,7 +104,7 @@ Manual configuration:
   "mcpServers": {
     "reddit": {
       "command": "npx",
-      "args": ["-y", "git+https://github.com/TiranSpierer/reddit-mcp.git"]
+      "args": ["-y", "-p", "git+https://github.com/TiranSpierer/reddit.git", "reddit-mcp"]
     }
   }
 }

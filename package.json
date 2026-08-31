@@ -1,6 +1,6 @@
 {
-  "name": "reddit-mcp",
-  "version": "1.0.0",
+  "name": "reddit",
+  "version": "2.0.0",
   "description": "Reddit core with CLI and MCP adapters",
   "type": "module",
   "workspaces": ["packages/*"],

@@ -7,7 +7,7 @@ import { tools } from "./tools.js";
 const sourceDirectory = dirname(fileURLToPath(import.meta.url));
 
 export function createServer(): McpServer {
-  const server = new McpServer({ name: "reddit-mcp", version: "1.0.0" });
+  const server = new McpServer({ name: "reddit-mcp", version: "2.0.0" });
   server.resource("api-behavior", "reddit://api-behavior", { mimeType: "text/markdown" }, () => ({
     contents: [{
       uri: "reddit://api-behavior",
