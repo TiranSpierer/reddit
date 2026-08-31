@@ -2,7 +2,8 @@
 
 Read-only Reddit access for coding agents: search Reddit and individual communities, browse feeds, and save complete discussion threads for local analysis. No API key is required.
 
-Recommended: install [`web-platforms`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace. The CLI is preferred for better token efficiency.
+> [!TIP]
+> **Recommended:** Install [`web-platforms`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace. The CLI is preferred for better token efficiency.
 
 > [!IMPORTANT]
 > **Migrating from v1:** replace the old implicit `npx -y git+https://github.com/TiranSpierer/reddit-mcp.git` command with the explicit MCP command shown below.
