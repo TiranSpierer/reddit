@@ -54,18 +54,26 @@ export function buildProgram(): Command {
 
   const globalSearch = addDebug(addPaging(addSearchSelection(program.command("search")
     .description("Search posts across Reddit.")
-    .argument("<query>", "search query"))));
-  globalSearch.action((query: string, options, command: Command) => output(command, async () => presentListing(await searchReddit({
-    query, sort: options.sort as SearchSort, time: options.time as TimeWindow, limit: options.limit, after: options.after,
-  }))));
+    .argument("<query>", "search query")
+    .option("--subreddit <name>", "search within a subreddit")
+    .addOption(new Option("--subreddits", "find subreddits instead of posts").conflicts("subreddit"))
+    .addOption(new Option("--communities", "find subreddits instead of posts").hideHelp().conflicts("subreddit")))));
+  globalSearch.action((query: string, options, command: Command) => output(command, async () => {
+    if (options.subreddits || options.communities) {
+      return presentSubreddits(await findSubreddits(query, options));
+    }
+    if (options.subreddit) {
+      return presentListing(await searchSubreddit(options.subreddit, {
+        query, sort: options.sort as SearchSort, time: options.time as TimeWindow, limit: options.limit, after: options.after,
+      }));
+    }
+    return presentListing(await searchReddit({
+      query, sort: options.sort as SearchSort, time: options.time as TimeWindow, limit: options.limit, after: options.after,
+    }));
+  }));
 
-  const subreddit = addDebug(program.command("subreddit").description("Find and inspect Reddit communities."));
+  const subreddit = addDebug(program.command("subreddit").alias("community").description("Inspect and browse Reddit communities."));
   subreddit.action(() => subreddit.help());
-
-  const find = addDebug(addPaging(subreddit.command("find")
-    .description("Find subreddits by name or topic.")
-    .argument("<query>", "community search query")));
-  find.action((query: string, options, command: Command) => output(command, async () => presentSubreddits(await findSubreddits(query, options))));
 
   const info = addDebug(subreddit.command("info")
     .description("Show subreddit metadata and save its sidebar and rules.")
@@ -84,25 +92,14 @@ export function buildProgram(): Command {
     after: options.after,
   }))));
 
-  const subredditSearch = addDebug(addPaging(addSearchSelection(subreddit.command("search")
-    .description("Search posts within a subreddit.")
-    .argument("<subreddit>", "subreddit name, with or without r/")
-    .argument("<query>", "search query"))));
-  subredditSearch.action((name: string, query: string, options, command: Command) => output(command, async () => presentListing(await searchSubreddit(name, {
-    query,
-    sort: options.sort as SearchSort,
-    time: options.time as TimeWindow,
-    limit: options.limit,
-    after: options.after,
-  }))));
-
-  const thread = addDebug(program.command("thread")
+  const post = addDebug(program.command("post")
+    .alias("thread")
     .description("Save a Reddit post and its comment discussion.")
     .argument("<post>", "post ID, t3_ fullname, or Reddit URL")
     .addOption(new Option("--comment-sort <order>", "comment order").choices([...COMMENT_SORTS]).default("best"))
     .option("--comment <id>", "save only a focused comment subtree"));
-  thread.addHelpText("after", "\nSaves post.md and the selected comments to the OS temporary directory. By default requests Reddit's fullest practical comment tree.\n");
-  thread.action((value: string, options, command: Command) => output(command, async () => presentThread(await getThread(value, {
+  post.addHelpText("after", "\nSaves post.md and the selected comments to the OS temporary directory. By default requests Reddit's fullest practical comment tree.\n");
+  post.action((value: string, options, command: Command) => output(command, async () => presentThread(await getThread(value, {
     commentSort: options.commentSort as CommentSort,
     commentId: options.comment,
   }))));

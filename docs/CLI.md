@@ -1,9 +1,11 @@
 # CLI reference
 
-## Global search
+## Search
 
 ```text
 reddit-cli search <query>
+  --subreddit <name>             search within a subreddit
+  --subreddits                   find subreddits instead of posts (alias: --communities)
   --sort relevance|hot|top|new|comments
   --time hour|day|week|month|year|all
   --limit 1..100
@@ -14,11 +16,6 @@ reddit-cli search <query>
 ## Subreddits
 
 ```text
-reddit-cli subreddit find <query>
-  --limit 1..100
-  --after <cursor>
-  --debug
-
 reddit-cli subreddit info <subreddit>
   --debug
 
@@ -28,27 +25,20 @@ reddit-cli subreddit posts <subreddit>
   --limit 1..100
   --after <cursor>
   --debug
-
-reddit-cli subreddit search <subreddit> <query>
-  --sort relevance|hot|top|new|comments
-  --time hour|day|week|month|year|all
-  --limit 1..100
-  --after <cursor>
-  --debug
 ```
 
 Subreddit names accept an optional `r/` prefix. `info` prints compact metadata and saves the full sidebar and rules.
 
-## Threads
+## Posts
 
 ```text
-reddit-cli thread <post-id|t3_fullname|reddit-url>
+reddit-cli post <post-id|t3_fullname|reddit-url>
   --comment-sort best|top|new|controversial|old|qa
   --comment <comment-id>
   --debug
 ```
 
-Thread retrieval requests up to 500 top-level comments and depth 10, then preserves Reddit's remaining `more` counts in the saved tree. Stdout includes:
+Post retrieval requests up to 500 top-level comments and depth 10, then preserves Reddit's remaining `more` counts in the saved tree. Stdout includes:
 
 ```yaml
 comments_saved: 12

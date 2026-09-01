@@ -12,13 +12,13 @@ test("top-level help exposes the resource-oriented CLI", () => {
   const result = cli("--help");
   assert.equal(result.status, 0);
   assert.match(result.stdout, /search \[options\] <query>/);
-  assert.match(result.stdout, /subreddit \[options\]/);
-  assert.match(result.stdout, /thread \[options\] <post>/);
+  assert.match(result.stdout, /subreddit\|community \[options\]/);
+  assert.match(result.stdout, /post\|thread \[options\] <post>/);
   assert.doesNotMatch(result.stdout, /get-post|search-reddit|challenge/);
 });
 
-test("thread help has deterministic files and no output-suppression flags", () => {
-  const result = cli("thread", "--help");
+test("post help has deterministic files and no output-suppression flags", () => {
+  const result = cli("post", "--help");
   assert.equal(result.status, 0);
   assert.match(result.stdout, /fullest practical comment tree/);
   assert.match(result.stdout, /--comment-sort/);

@@ -1,6 +1,6 @@
 # Reddit
 
-Read-only Reddit access for coding agents: search Reddit and individual communities, browse feeds, and save complete discussion threads for local analysis. No API key is required.
+Read-only Reddit access for coding agents: search Reddit and individual communities, browse feeds, and save complete posts with their discussions for local analysis. No API key is required.
 
 > [!TIP]
 > **Recommended:** Install [`web-platforms`](https://github.com/TiranSpierer/agent-plugins) from the agent plugin marketplace. The CLI is preferred for better token efficiency.
@@ -121,18 +121,18 @@ Commands:
 
 ```bash
 reddit-cli search "typescript error" --sort top --time year
+reddit-cli search "budget mop" --subreddit RobotVacuums
+reddit-cli search "robot vacuum" --subreddits
 
-reddit-cli subreddit find "robot vacuum"
 reddit-cli subreddit info RobotVacuums
 reddit-cli subreddit posts RobotVacuums --sort new
-reddit-cli subreddit search RobotVacuums "budget mop"
 
-reddit-cli thread 1w391er
-reddit-cli thread <reddit-url> --comment-sort top
-reddit-cli thread 1w391er --comment p6ypqcs
+reddit-cli post 1w391er
+reddit-cli post <reddit-url> --comment-sort top
+reddit-cli post 1w391er --comment p6ypqcs
 ```
 
-Searches and feeds print compact YAML with an `after` cursor. Subreddit sidebars/rules and thread bodies/comments are saved under the OS temporary directory; stdout returns compact metadata and file paths.
+Searches and feeds print compact YAML with an `after` cursor. Subreddit sidebars/rules and post bodies/comments are saved under the OS temporary directory; stdout returns compact metadata and file paths.
 
 See [docs/CLI.md](docs/CLI.md) for the full command reference.
 
@@ -161,7 +161,7 @@ Add `--debug` before or after a CLI command. Normal errors remain concise on std
 
 ```bash
 reddit-cli subreddit info missing-community --debug
-reddit-cli --debug thread missing-post
+reddit-cli --debug post missing-post
 ```
 
 </details>
