@@ -2,9 +2,11 @@
 
 ## Access modes
 
-When `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` are both set, requests use a client-credentials bearer token at `oauth.reddit.com`. Otherwise requests use Reddit's anonymous JSON endpoints with browser headers and session cookies.
+When `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` are both set, requests use a client-credentials bearer token at `oauth.reddit.com`. Otherwise the client solves Reddit's JavaScript challenge to obtain a `token_v2` anonymous JWT, then uses it as a bearer token on `oauth.reddit.com`.
 
-Anonymous access bootstraps cookies through Reddit's Atom endpoint and automatically handles the currently known JavaScript challenge. If Reddit changes that flow, the client throws `REDDIT_ACCESS_BLOCKED`; `--debug` exposes the failed response body for diagnosis.
+Reddit blocks anonymous tokens on `/comments/<id>` and `/search` endpoints. Those operations fall back to fetching the HTML page from `www.reddit.com` and parsing the Shreddit web components with cheerio.
+
+If Reddit changes the challenge flow, the client throws `REDDIT_ACCESS_BLOCKED`; `--debug` exposes the failed response body for diagnosis.
 
 ## Rate limits
 
@@ -12,17 +14,25 @@ The client tracks `x-ratelimit-remaining` and `x-ratelimit-reset`, waits when ex
 
 ## Endpoints
 
+JSON via `oauth.reddit.com` (bearer token):
+
 ```text
-/search.json
-/subreddits/search.json
-/r/<subreddit>/about.json
-/r/<subreddit>/about/rules.json
-/r/<subreddit>/<sort>.json
-/r/<subreddit>/search.json
-/comments/<post-id>.json
+/subreddits/search
+/r/<subreddit>/about
+/r/<subreddit>/about/rules
+/r/<subreddit>/<sort>
+/r/<subreddit>/search
+/by_id/t3_<post-id>
 ```
 
-The comments endpoint returns a two-element array: post listing followed by comment listing. Comment trees can contain `more` stubs instead of comments; their counts are preserved as `more_count` or `more_replies`.
+HTML via `www.reddit.com` (session cookies):
+
+```text
+/r/<subreddit>/comments/<post-id>/   → comment tree (parsed from shreddit-comment elements)
+/search/?q=<query>&type=link         → post search results (parsed from data-testid elements)
+```
+
+The HTML comment tree is built from `<shreddit-comment>` attributes: `thingid`, `author`, `score`, `depth`, `parentid`, `created`. Comment bodies come from `<div id="t1_xxx-comment-rtjson-content">`.
 
 Deleted and moderator-removed content are valid Reddit values (`[deleted]` and `[removed]`), not client errors.
 
