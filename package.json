@@ -3,7 +3,9 @@
   "version": "2.0.0",
   "description": "Reddit core with CLI and MCP adapters",
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "bin": {
     "reddit-mcp": "packages/mcp/dist/index.js",
     "reddit-cli": "packages/cli/dist/cli.js"
@@ -27,6 +29,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@tiranspierer/reddit-core": "file:packages/core",
     "@tiranspierer/reddit-output": "file:packages/output",
+    "cheerio": "^1.2.0",
     "commander": "^14.0.0",
     "html-entities": "^2.6.0",
     "yaml": "^2.0.0",

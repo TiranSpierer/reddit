@@ -1,5 +1,6 @@
 import { reddit } from "../client.js";
-import { type RawPost, type RawListing, type PostSummary, toPostSummary, normalizeSubreddit } from "../types.js";
+import { type PostSummary, normalizeSubreddit } from "../types.js";
+import { parseSearchPage } from "../parser.js";
 
 export type SearchSort = "relevance" | "hot" | "top" | "new" | "comments";
 export type TimeWindow = "hour" | "day" | "week" | "month" | "year" | "all";
@@ -18,24 +19,25 @@ export interface SearchResult {
 }
 
 async function search(path: string, args: SearchArgs, restrict = false): Promise<SearchResult> {
-  const data = await reddit.get<RawListing<RawPost>>(path, {
+  const html = await reddit.getHtml(path, {
     q: args.query,
     ...(restrict ? { restrict_sr: 1 } : {}),
     sort: args.sort ?? "relevance",
     t: args.time ?? "all",
-    limit: args.limit ?? 25,
-    after: args.after,
+    type: "link",
   });
+  const result = parseSearchPage(html);
+  const limit = args.limit ?? 25;
   return {
-    posts: data.data.children.filter((child) => child.kind === "t3").map((child) => toPostSummary(child.data)),
-    after: data.data.after,
+    posts: result.posts.slice(0, limit),
+    after: result.after,
   };
 }
 
 export function searchReddit(args: SearchArgs): Promise<SearchResult> {
-  return search("/search.json", args);
+  return search("/search/", args);
 }
 
 export function searchSubreddit(subreddit: string, args: SearchArgs): Promise<SearchResult> {
-  return search(`/r/${normalizeSubreddit(subreddit)}/search.json`, args, true);
+  return search(`/r/${normalizeSubreddit(subreddit)}/search/`, args, true);
 }

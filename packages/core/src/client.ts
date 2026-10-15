@@ -109,6 +109,46 @@ class RedditClient {
     return HAS_OAUTH ? this.fetchOAuth<T>(url.toString(), false) : this.fetchAnonymous<T>(url.toString(), false);
   }
 
+  async getHtml(path: string, params: Record<string, string | number | undefined> = {}): Promise<string> {
+    const url = new URL(path, BASE_URL);
+    for (const [name, value] of Object.entries(params)) {
+      if (value !== undefined) url.searchParams.set(name, String(value));
+    }
+    if (this.rateLimit.remaining <= 0) {
+      const wait = Math.max(0, this.rateLimit.resetAt - Date.now());
+      if (wait) await sleep(wait);
+    }
+    const cookies = await this.ensureCookies();
+    let response: Response;
+    try {
+      response = await fetch(url.toString(), { headers: { ...BROWSER_HEADERS, Cookie: cookies }, redirect: "follow" });
+    } catch (error) {
+      throw new RedditError("NETWORK_ERROR", `Network request failed: ${String(error)}`);
+    }
+    this.updateRateLimit(response.headers);
+    const body = await response.text();
+    if (response.ok) return body;
+    if (response.status === 429) {
+      await sleep(Number(response.headers.get("x-ratelimit-reset") ?? 10) * 1000);
+      return this.getHtml(path, params);
+    }
+    if (response.status === 403) {
+      this.cookies = null;
+      const cookies2 = await this.ensureCookies();
+      let retry: Response;
+      try {
+        retry = await fetch(url.toString(), { headers: { ...BROWSER_HEADERS, Cookie: cookies2 }, redirect: "follow" });
+      } catch (error) {
+        throw new RedditError("NETWORK_ERROR", `Network request failed: ${String(error)}`);
+      }
+      const retryBody = await retry.text();
+      if (retry.ok) return retryBody;
+      throw responseError("REDDIT_ACCESS_BLOCKED", `Reddit denied access (HTTP ${retry.status})`, retry, retryBody);
+    }
+    if (response.status === 404) throw responseError("NOT_FOUND", `Not found: ${url}`, response, body);
+    throw responseError("NETWORK_ERROR", `Unexpected HTTP ${response.status}`, response, body);
+  }
+
   private updateRateLimit(headers: Headers): void {
     const remaining = headers.get("x-ratelimit-remaining");
     const reset = headers.get("x-ratelimit-reset");

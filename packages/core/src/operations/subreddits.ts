@@ -1,48 +1,27 @@
 import { decode } from "html-entities";
 import { reddit } from "../client.js";
 import {
-  type RawPost, type RawSubreddit, type RawListing, type RawRulesResponse,
-  type PostSummary, type SubredditSummary, type SubredditFull, toPostSummary, toSubredditSummary,
-  normalizeSubreddit, normalizeSubredditType, decodeRedditText, RedditError,
+  type PostSummary, type SubredditSummary, type SubredditFull,
+  normalizeSubreddit, RedditError,
 } from "../types.js";
+import { parseFeedPage, parseSubredditPage, parseSubredditSearch } from "../parser.js";
 import type { TimeWindow } from "./search.js";
 
 export interface PageArgs { limit?: number; after?: string }
 
 export async function findSubreddits(query: string, args: PageArgs = {}): Promise<{ subreddits: SubredditSummary[]; after: string | null }> {
-  const data = await reddit.get<RawListing<RawSubreddit>>("/subreddits/search.json", {
-    q: query, limit: args.limit ?? 25, after: args.after,
-  });
-  return {
-    subreddits: data.data.children.filter((child) => child.kind === "t5").map((child) => toSubredditSummary(child.data)),
-    after: data.data.after,
-  };
+  const html = await reddit.getHtml("/search/", { q: query, type: "sr" });
+  const result = parseSubredditSearch(html);
+  const limit = args.limit ?? 25;
+  return { subreddits: result.subreddits.slice(0, limit), after: result.after };
 }
 
 export async function subredditInfo(subreddit: string): Promise<SubredditFull> {
   const name = normalizeSubreddit(subreddit);
-  const about = await reddit.get<{ kind: string; data: RawSubreddit }>(`/r/${name}/about.json`);
-  if ((about.data as unknown as Record<string, unknown>).quarantine === true) {
-    throw new RedditError("SUBREDDIT_QUARANTINED", `r/${name} is quarantined`);
-  }
-  const rules = await reddit.get<RawRulesResponse>(`/r/${name}/about/rules.json`);
-  return {
-    name: about.data.display_name,
-    display_name: `r/${about.data.display_name}`,
-    title: decode(about.data.title),
-    description: decode(about.data.public_description),
-    subscribers: about.data.subscribers,
-    active_users: about.data.active_user_count,
-    created_utc: about.data.created_utc,
-    type: normalizeSubredditType(about.data.subreddit_type),
-    nsfw: about.data.over18,
-    url: `https://www.reddit.com${about.data.url}`,
-    description_long: decodeRedditText(about.data.description),
-    rules: (rules.rules ?? []).map((rule) => ({
-      short_name: decodeRedditText(rule.short_name),
-      description: decodeRedditText(rule.description),
-    })),
-  };
+  const html = await reddit.getHtml(`/r/${name}/`);
+  const info = parseSubredditPage(html);
+  if (!info.name) throw new RedditError("NOT_FOUND", `Subreddit not found: r/${name}`);
+  return info;
 }
 
 export type FeedSort = "hot" | "new" | "top" | "rising" | "controversial";
@@ -50,11 +29,8 @@ export type FeedSort = "hot" | "new" | "top" | "rising" | "controversial";
 export async function subredditPosts(subreddit: string, args: PageArgs & { sort?: FeedSort; time?: TimeWindow } = {}): Promise<{ posts: PostSummary[]; after: string | null }> {
   const name = normalizeSubreddit(subreddit);
   const sort = args.sort ?? "hot";
-  const data = await reddit.get<RawListing<RawPost>>(`/r/${name}/${sort}.json`, {
-    t: args.time ?? "day", limit: args.limit ?? 25, after: args.after,
-  });
-  return {
-    posts: data.data.children.filter((child) => child.kind === "t3").map((child) => toPostSummary(child.data)),
-    after: data.data.after,
-  };
+  const html = await reddit.getHtml(`/r/${name}/${sort}/`, { t: args.time ?? "day" });
+  const result = parseFeedPage(html);
+  const limit = args.limit ?? 25;
+  return { posts: result.posts.slice(0, limit), after: result.after };
 }
