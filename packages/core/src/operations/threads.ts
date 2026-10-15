@@ -1,9 +1,10 @@
 import { reddit } from "../client.js";
 import {
   type RawPost, type RawComment, type RawMoreStub, type RawListing,
-  type CommentsResponse, type Comment, toPostFull, extractPostId, normalizeCommentId,
+  type Comment, toPostFull, extractPostId, normalizeCommentId,
   decodeRedditText, RedditError,
 } from "../types.js";
+import { parseCommentsHtml } from "../parser.js";
 
 export type CommentSort = "best" | "top" | "new" | "controversial" | "old" | "qa";
 
@@ -65,24 +66,32 @@ export async function getThread(
   const sort = args.commentSort ?? "best";
   const includeComments = args.includeComments !== false;
   const commentId = args.commentId ? normalizeCommentId(args.commentId) : undefined;
-  const response = await reddit.get<CommentsResponse>(`/comments/${id}.json`, {
-    sort,
-    limit: includeComments ? (args.commentLimit ?? 500) : 0,
-    depth: args.commentDepth ?? 10,
-    ...(commentId ? { comment: commentId } : {}),
-  });
-  const rawPost = response[0].data.children[0]?.data as RawPost | undefined;
+
+  const postData = await reddit.get<RawListing<RawPost>>(`/by_id/t3_${id}`);
+  const rawPost = postData.data.children[0]?.data;
   if (!rawPost) throw new RedditError("NOT_FOUND", `Post not found: ${value}`);
   const post = toPostFull(rawPost);
-  const parsed = includeComments ? parseCommentTree(response[1].data.children) : { items: [], moreCount: 0 };
-  if (commentId && !containsComment(parsed.items, commentId)) {
+
+  let comments: Comment[] = [];
+  let moreCount = 0;
+
+  if (includeComments) {
+    const htmlPath = post.permalink.replace("https://www.reddit.com", "");
+    const html = await reddit.getHtml(htmlPath, { sort });
+    const parsed = parseCommentsHtml(html);
+    comments = parsed.comments;
+    moreCount = Math.max(0, post.num_comments - countComments(comments));
+  }
+
+  if (commentId && !containsComment(comments, commentId)) {
     throw new RedditError("NOT_FOUND", `Comment not found in post ${id}: ${commentId}`);
   }
+
   return {
     post,
-    comments: parsed.items,
-    commentsSaved: countComments(parsed.items),
-    moreCount: parsed.moreCount,
+    comments,
+    commentsSaved: countComments(comments),
+    moreCount,
     sort,
     includeComments,
     ...(commentId ? { commentId } : {}),

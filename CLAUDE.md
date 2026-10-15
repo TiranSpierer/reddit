@@ -15,6 +15,7 @@ node packages/cli/dist/cli.js --help
 ## Architecture
 
 - `packages/core` owns the Reddit client, OAuth/cookies/challenges, rate limits, typed errors, domain mappings, search, communities, feeds, and configurable thread retrieval.
+- Anonymous mode solves the JS challenge to obtain a `token_v2` JWT, then uses it as Bearer on `oauth.reddit.com` for JSON access. Comments and post search fall back to HTML parsing with cheerio (Reddit blocks those specific endpoints for anonymous tokens).
 - `packages/output` owns YAML, atomic files, ISO timestamp presentation, subreddit sidebar/rules files, and thread body/comment files.
 - `packages/cli` owns the explicit Commander hierarchy, choices, debug behavior, and CLI defaults.
 - `packages/mcp` owns the legacy six MCP tool names, Zod schemas, stdio server, and MCP defaults.
@@ -24,6 +25,7 @@ Core operations return structured values and throw `RedditError`. They do not im
 ## Invariants
 
 - Route all Reddit requests through `client.ts`.
+- All HTML parsing for comments and search goes through `parser.ts` using cheerio.
 - Never print request authorization, cookies, client secrets, or OAuth tokens.
 - `--debug` prints only an untouched failed response body; normal errors stay concise on stderr.
 - Search/feed results remain bounded stdout YAML and retain Reddit cursors.

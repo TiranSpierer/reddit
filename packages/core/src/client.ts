@@ -30,6 +30,11 @@ function joinSetCookies(headers: Headers, existing = ""): string {
   return [existing, ...pairs].filter(Boolean).join("; ");
 }
 
+function extractCookieValue(cookies: string, name: string): string | undefined {
+  const match = cookies.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+  return match?.[1];
+}
+
 function debugResponse(response: Response, body: string): RedditDebugResponse {
   return {
     url: response.url,
@@ -91,14 +96,36 @@ async function ensureOAuthToken(): Promise<string> {
 
 interface RateLimitState { remaining: number; resetAt: number }
 
+interface AnonSession { cookies: string; bearerToken: string }
+
 class RedditClient {
   private rateLimit: RateLimitState = { remaining: 100, resetAt: 0 };
-  private cookies: string | null = null;
-  private cookiePromise: Promise<string> | null = null;
+  private anonSession: AnonSession | null = null;
+  private anonSessionPromise: Promise<AnonSession> | null = null;
 
   async get<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
     const cleanPath = path.endsWith(".json") ? path : `${path}.json`;
-    const url = new URL(cleanPath, HAS_OAUTH ? OAUTH_BASE_URL : BASE_URL);
+    if (this.rateLimit.remaining <= 0) {
+      const wait = Math.max(0, this.rateLimit.resetAt - Date.now());
+      if (wait) await sleep(wait);
+    }
+    if (HAS_OAUTH) {
+      const url = new URL(cleanPath, OAUTH_BASE_URL);
+      for (const [name, value] of Object.entries(params)) {
+        if (value !== undefined) url.searchParams.set(name, String(value));
+      }
+      return this.fetchOAuth<T>(url.toString(), false);
+    }
+    const session = await this.ensureAnonSession();
+    const url = new URL(cleanPath, OAUTH_BASE_URL);
+    for (const [name, value] of Object.entries(params)) {
+      if (value !== undefined) url.searchParams.set(name, String(value));
+    }
+    return this.fetchBearer<T>(url.toString(), session.bearerToken, false);
+  }
+
+  async getHtml(path: string, params: Record<string, string | number | undefined> = {}): Promise<string> {
+    const url = new URL(path, BASE_URL);
     for (const [name, value] of Object.entries(params)) {
       if (value !== undefined) url.searchParams.set(name, String(value));
     }
@@ -106,7 +133,35 @@ class RedditClient {
       const wait = Math.max(0, this.rateLimit.resetAt - Date.now());
       if (wait) await sleep(wait);
     }
-    return HAS_OAUTH ? this.fetchOAuth<T>(url.toString(), false) : this.fetchAnonymous<T>(url.toString(), false);
+    const session = await this.ensureAnonSession();
+    let response: Response;
+    try {
+      response = await fetch(url.toString(), { headers: { ...BROWSER_HEADERS, Cookie: session.cookies }, redirect: "follow" });
+    } catch (error) {
+      throw new RedditError("NETWORK_ERROR", `Network request failed: ${String(error)}`);
+    }
+    this.updateRateLimit(response.headers);
+    const body = await response.text();
+    if (response.ok) return body;
+    if (response.status === 429) {
+      await sleep(Number(response.headers.get("x-ratelimit-reset") ?? 10) * 1000);
+      return this.getHtml(path, params);
+    }
+    if (response.status === 403) {
+      this.anonSession = null;
+      const fresh = await this.ensureAnonSession();
+      let retry: Response;
+      try {
+        retry = await fetch(url.toString(), { headers: { ...BROWSER_HEADERS, Cookie: fresh.cookies }, redirect: "follow" });
+      } catch (error) {
+        throw new RedditError("NETWORK_ERROR", `Network request failed: ${String(error)}`);
+      }
+      const retryBody = await retry.text();
+      if (retry.ok) return retryBody;
+      throw responseError("REDDIT_ACCESS_BLOCKED", `Reddit denied access (HTTP ${retry.status})`, retry, retryBody);
+    }
+    if (response.status === 404) throw responseError("NOT_FOUND", `Not found: ${url}`, response, body);
+    throw responseError("NETWORK_ERROR", `Unexpected HTTP ${response.status}`, response, body);
   }
 
   private updateRateLimit(headers: Headers): void {
@@ -146,18 +201,48 @@ class RedditClient {
     throw responseError("NETWORK_ERROR", `Unexpected HTTP ${response.status}`, response, body);
   }
 
-  private async ensureCookies(): Promise<string> {
-    if (this.cookies) return this.cookies;
-    if (!this.cookiePromise) {
-      this.cookiePromise = this.solveKnownChallenge().then((cookies) => {
-        this.cookies = cookies;
-        return cookies;
-      }).finally(() => { this.cookiePromise = null; });
+  private async fetchBearer<T>(url: string, token: string, retried: boolean): Promise<T> {
+    let response: Response;
+    try {
+      response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, "User-Agent": USER_AGENT } });
+    } catch (error) {
+      throw new RedditError("NETWORK_ERROR", `Network request failed: ${String(error)}`);
     }
-    return this.cookiePromise;
+    this.updateRateLimit(response.headers);
+    const body = await response.text();
+    if (response.ok) return parseJson<T>(response, body);
+    if (response.status === 429 && !retried) {
+      await sleep(Number(response.headers.get("x-ratelimit-reset") ?? 10) * 1000);
+      return this.fetchBearer<T>(url, token, true);
+    }
+    if (response.status === 429) throw responseError("RATE_LIMITED", "Reddit rate limit exceeded after retry", response, body);
+    if (response.status === 403 && !retried) {
+      this.anonSession = null;
+      const fresh = await this.ensureAnonSession();
+      return this.fetchBearer<T>(url, fresh.bearerToken, true);
+    }
+    if (response.status === 403) {
+      const reason = (() => { try { return (JSON.parse(body) as { reason?: string }).reason; } catch { return undefined; } })();
+      if (reason === "private") throw responseError("SUBREDDIT_PRIVATE", "This subreddit is private", response, body);
+      if (reason === "banned") throw responseError("SUBREDDIT_BANNED", "This subreddit has been banned", response, body);
+      throw responseError("REDDIT_ACCESS_BLOCKED", `Reddit denied access (HTTP ${response.status})`, response, body);
+    }
+    if (response.status === 404) throw responseError("NOT_FOUND", `Not found: ${url}`, response, body);
+    throw responseError("NETWORK_ERROR", `Unexpected HTTP ${response.status}`, response, body);
   }
 
-  private async solveKnownChallenge(): Promise<string> {
+  private async ensureAnonSession(): Promise<AnonSession> {
+    if (this.anonSession) return this.anonSession;
+    if (!this.anonSessionPromise) {
+      this.anonSessionPromise = this.solveKnownChallenge().then((session) => {
+        this.anonSession = session;
+        return session;
+      }).finally(() => { this.anonSessionPromise = null; });
+    }
+    return this.anonSessionPromise;
+  }
+
+  private async solveKnownChallenge(): Promise<AnonSession> {
     let initial: Response;
     try {
       initial = await fetch(BOOTSTRAP_URL, { headers: BROWSER_HEADERS, redirect: "follow" });
@@ -165,8 +250,11 @@ class RedditClient {
       throw new RedditError("NETWORK_ERROR", `Reddit bootstrap failed: ${String(error)}`);
     }
     const body = await initial.text();
-    const cookies = joinSetCookies(initial.headers);
-    if (!body.includes(CHALLENGE_MARKER)) return cookies;
+    let cookies = joinSetCookies(initial.headers);
+    if (!body.includes(CHALLENGE_MARKER)) {
+      const bearerToken = extractCookieValue(cookies, "token_v2") || "";
+      return { cookies, bearerToken };
+    }
     const seed = body.match(/\("([0-9a-f]+)"\)/)?.[1];
     const token = body.match(/name="jsc_token"\s+value="([^"]+)"/)?.[1];
     if (!seed || !token) {
@@ -187,37 +275,9 @@ class RedditClient {
     if (!solved.ok || solvedBody.includes(CHALLENGE_MARKER)) {
       throw responseError("REDDIT_ACCESS_BLOCKED", `Reddit challenge failed (HTTP ${solved.status})`, solved, solvedBody);
     }
-    return joinSetCookies(solved.headers, cookies);
-  }
-
-  private async fetchAnonymous<T>(url: string, retried: boolean): Promise<T> {
-    const cookies = await this.ensureCookies();
-    let response: Response;
-    try {
-      response = await fetch(url, { headers: { ...BROWSER_HEADERS, Cookie: cookies }, redirect: "follow" });
-    } catch (error) {
-      throw new RedditError("NETWORK_ERROR", `Network request failed: ${String(error)}`);
-    }
-    this.updateRateLimit(response.headers);
-    const body = await response.text();
-    if (response.ok) return parseJson<T>(response, body);
-    if (response.status === 429 && !retried) {
-      await sleep(Number(response.headers.get("x-ratelimit-reset") ?? 10) * 1000);
-      return this.fetchAnonymous<T>(url, true);
-    }
-    if (response.status === 429) throw responseError("RATE_LIMITED", "Reddit rate limit exceeded after retry", response, body);
-    if (response.status === 403 && !retried) {
-      this.cookies = null;
-      return this.fetchAnonymous<T>(url, true);
-    }
-    if (response.status === 403) {
-      const reason = (() => { try { return (JSON.parse(body) as { reason?: string }).reason; } catch { return undefined; } })();
-      if (reason === "private") throw responseError("SUBREDDIT_PRIVATE", "This subreddit is private", response, body);
-      if (reason === "banned") throw responseError("SUBREDDIT_BANNED", "This subreddit has been banned", response, body);
-      throw responseError("REDDIT_ACCESS_BLOCKED", `Reddit denied access (HTTP ${response.status})`, response, body);
-    }
-    if (response.status === 404) throw responseError("NOT_FOUND", `Not found: ${url}`, response, body);
-    throw responseError("NETWORK_ERROR", `Unexpected HTTP ${response.status}`, response, body);
+    cookies = joinSetCookies(solved.headers, cookies);
+    const bearerToken = extractCookieValue(cookies, "token_v2") || "";
+    return { cookies, bearerToken };
   }
 }
 
